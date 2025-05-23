@@ -2,6 +2,7 @@
 create_root:
 	debootstrap --include=docker.io,cryptsetup bookworm target
 	rsync -vah etc/* target/etc
+	rsync -vah usr/* target/usr
 	chroot target apt-get update
 	chroot target apt-get install -y linux-image-amd64
 	chroot target apt-get install -y grub-pc
@@ -9,6 +10,10 @@ create_root:
 	chroot target apt-get install -y openssl
 	chroot target apt-get install -y qemu-guest-agent
 	chroot target bash -c 'echo "root:root" | chpasswd'
+	chroot target apt-get clean
+	chroot target apt-get autoclean
+	chroot target rm -rf /var/lib/apt/lists/*
+	$(MAKE) create_qcow2
 
 create_qcow2:
 	qemu-img create -f qcow2 ackon-runner.img 20G
@@ -38,12 +43,9 @@ create_qcow2_grub:
 	mount -t sysfs sysfs ./target-mount/sys
 	mount -t tmpfs tmpfs ./target-mount/tmp
 	chroot target-mount bash -c "echo 'GRUB_DISABLE_OS_PROBER=true' >> /etc/default/grub"
+	chroot target-mount /usr/src/tools/fstab.sh
 	chroot target-mount grub-install --target=i386-pc --recheck /dev/nbd0
 	chroot target-mount update-grub2
-
-#bash -c "UUID1=$(blkid /dev/nbd0p2 | grep -Eo ' UUID="[^ ]*"' | sed 's/[" ]//g'); "
-#echo "$UUID1 / ext4 errors=remount-ro 0 1" >> /etc/fstab
-
 
 clean:
 	rm -rf target
